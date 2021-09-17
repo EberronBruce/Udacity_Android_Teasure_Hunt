@@ -69,7 +69,7 @@ class HuntMainActivity : AppCompatActivity() {
     private lateinit var viewModel: GeofenceViewModel
 
     // Step 2 add in variable to check if device is running Q or later
-    private val runningQOrLater = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
+    private val runningQOrLater = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
     // A PendingIntent for the Broadcast Receiver that handles geofence transitions.
     // TODO: Step 8 add in a pending intent
@@ -99,8 +99,11 @@ class HuntMainActivity : AppCompatActivity() {
  */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        // TODO: Step 7 add code to check that the user turned on their device location and ask
+        //Step 7 add code to check that the user turned on their device location and ask
         //  again if they did not
+        if (requestCode == REQUEST_TURN_DEVICE_LOCATION_ON) {
+            checkDeviceLocationSettingsAndStartGeofence(false)
+        }
     }
 
     /*
@@ -147,27 +150,6 @@ class HuntMainActivity : AppCompatActivity() {
                 setupSnackBarForNoPermissions()
             }
         }
-
-//        if (requestCode == REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE) {
-//            if (grantResults.isNotEmpty() && (grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_GRANTED)) {
-//                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//                    requestBackgroundPermission()
-//                } else {
-//                    checkDeviceLocationSettingsAndStartGeofence()
-//                }
-//            } else {
-//                setupSnackBarForNoPermissions()
-//            }
-//        } else if (requestCode == REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE) {
-//            Log.d(TAG, "grantedResults: ${grantResults.first()}")
-//            Log.d(TAG, "PackageManager: ${PackageManager.PERMISSION_GRANTED}")
-//            if (grantResults.isNotEmpty() && grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_GRANTED) { //crashing here
-//                checkDeviceLocationSettingsAndStartGeofence()
-//            } else {
-//               setupSnackBarForNoPermissions()
-//            }
-//        }
-        
     }
 
     private fun setupSnackBarForNoPermissions() {
@@ -202,7 +184,6 @@ class HuntMainActivity : AppCompatActivity() {
         if (foregroundAndBackgroundLocationPermissionApproved()) {
             checkDeviceLocationSettingsAndStartGeofence()
         } else {
-            //requestForegroundAndBackgroundLocationPermissions()
             requestForegroundPermission()
         }
     }
@@ -212,7 +193,34 @@ class HuntMainActivity : AppCompatActivity() {
      *  the opportunity to turn on location services within our app.
      */
     private fun checkDeviceLocationSettingsAndStartGeofence(resolve:Boolean = true) {
-        // TODO: Step 6 add code to check that the device's location is on
+        //Step 6 add code to check that the device's location is on
+        val locationRequest = LocationRequest.create().apply {
+            priority = LocationRequest.PRIORITY_LOW_POWER
+        }
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val settingsClient = LocationServices.getSettingsClient(this)
+        val locationSettingResponseTask = settingsClient.checkLocationSettings(builder.build())
+        locationSettingResponseTask.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException && resolve) {
+                try {
+                    exception.startResolutionForResult(this@HuntMainActivity, REQUEST_TURN_DEVICE_LOCATION_ON)
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    Log.d(TAG, "Error getting location settings resolution: ${sendEx.message}")
+                }
+            } else {
+                Snackbar.make(
+                    binding.activityMapsMain,
+                    R.string.location_required_error, Snackbar.LENGTH_INDEFINITE
+                ).setAction(android.R.string.ok) {
+                    checkDeviceLocationSettingsAndStartGeofence()
+                }.show()
+            }
+        }
+        locationSettingResponseTask.addOnCompleteListener {
+            if (it.isSuccessful) {
+                addGeofenceForClue()
+            }
+        }
     }
 
     /*
@@ -235,37 +243,9 @@ class HuntMainActivity : AppCompatActivity() {
     }
 
 
-
     /*
      *  Requests ACCESS_FINE_LOCATION and (on Android 10+ (Q) ACCESS_BACKGROUND_LOCATION.
      */
-//    @TargetApi(29 )
-//    private fun requestForegroundAndBackgroundLocationPermissions() {
-//        // Step 4 add code to request foreground and background permissions
-//        if (foregroundAndBackgroundLocationPermissionApproved())
-//            return
-//        var permissionsArray = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-//        //Log.d(TAG, "What is : ${Manifest.permission.ACCESS_FINE_LOCATION}")
-//        val resultCode = when {
-//            runningQOrLater -> {
-//                //permissionsArray += Manifest.permission.ACCESS_BACKGROUND_LOCATION
-//                //REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE
-//                //askPermisionForBackgroundUsage()
-//                //REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE
-//                REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
-//            }
-//            else -> {
-//                REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
-//            }
-//        }
-//        Log.d(TAG, "Request foreground only location permission")
-//        ActivityCompat.requestPermissions(
-//            this@HuntMainActivity,
-//            permissionsArray,
-//            resultCode
-//        )
-//    }
-
     private fun requestForegroundPermission() {
         val permissionsArray = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         val requestCode = REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
@@ -315,4 +295,4 @@ private const val REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE = 34
 private const val REQUEST_TURN_DEVICE_LOCATION_ON = 29
 private const val TAG = "--HuntMainActivity--"
 private const val LOCATION_PERMISSION_INDEX = 0
-private const val BACKGROUND_LOCATION_PERMISSION_INDEX = 1
+//private const val BACKGROUND_LOCATION_PERMISSION_INDEX = 1
