@@ -130,38 +130,58 @@ class HuntMainActivity : AppCompatActivity() {
     ) {
         // Step 5 add code to handle the result of the user's permission
         Log.d(TAG, "onRequestPermissionResult")
-       // Log.d(TAG, "grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX]: ${grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED} ")
-        //Log.d(TAG, "grantResults[LOCATION_PERMISSION_INDEX]: ${grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED}")
-        //Log.d(TAG, "requestCode: ${requestCode == REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE}")
-
-
-        if (
-            grantResults.isEmpty() || grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED || (requestCode == REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE &&
-                    grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)
-        )
-        {
-            Snackbar.make(
-                binding.activityMapsMain,
-                R.string.permission_denied_explanation,
-                Snackbar.LENGTH_INDEFINITE
-            ).setAction(R.string.settings) {
-                startActivity(Intent().apply {
-                    action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                    data = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                })
-            }.show()
-        } else {
-            if(runningQOrLater) {
-                if (ContextCompat.checkSelfPermission(this@HuntMainActivity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                    Log.d(TAG, "EMPTY BACKGROUND")
-                } else {
-                    askPermisionForBackgroundUsage()
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (grantResults.isNotEmpty() && (grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_GRANTED)) {
+                when (requestCode) {
+                    REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE -> requestBackgroundPermission()
+                    REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE -> checkDeviceLocationSettingsAndStartGeofence()
+                    else -> Log.d(TAG, "Improper Request Code, : $requestCode")
                 }
+            } else {
+                setupSnackBarForNoPermissions()
             }
-            checkDeviceLocationSettingsAndStartGeofence()
+        } else {
+            if (grantResults.isNotEmpty() && (grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_GRANTED) && requestCode == REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE) {
+                checkDeviceLocationSettingsAndStartGeofence()
+            } else {
+                setupSnackBarForNoPermissions()
+            }
         }
 
+//        if (requestCode == REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE) {
+//            if (grantResults.isNotEmpty() && (grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_GRANTED)) {
+//                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//                    requestBackgroundPermission()
+//                } else {
+//                    checkDeviceLocationSettingsAndStartGeofence()
+//                }
+//            } else {
+//                setupSnackBarForNoPermissions()
+//            }
+//        } else if (requestCode == REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE) {
+//            Log.d(TAG, "grantedResults: ${grantResults.first()}")
+//            Log.d(TAG, "PackageManager: ${PackageManager.PERMISSION_GRANTED}")
+//            if (grantResults.isNotEmpty() && grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_GRANTED) { //crashing here
+//                checkDeviceLocationSettingsAndStartGeofence()
+//            } else {
+//               setupSnackBarForNoPermissions()
+//            }
+//        }
+        
+    }
+
+    private fun setupSnackBarForNoPermissions() {
+        Snackbar.make(
+            binding.activityMapsMain,
+            R.string.permission_denied_explanation,
+            Snackbar.LENGTH_INDEFINITE
+        ).setAction(R.string.settings) {
+            startActivity(Intent().apply {
+                action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                data = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            })
+        }.show()
     }
 
     /**
@@ -182,7 +202,8 @@ class HuntMainActivity : AppCompatActivity() {
         if (foregroundAndBackgroundLocationPermissionApproved()) {
             checkDeviceLocationSettingsAndStartGeofence()
         } else {
-            requestForegroundAndBackgroundLocationPermissions()
+            //requestForegroundAndBackgroundLocationPermissions()
+            requestForegroundPermission()
         }
     }
 
@@ -213,52 +234,57 @@ class HuntMainActivity : AppCompatActivity() {
         return foregroundLocationApproved && backgroundPermissionApproved
     }
 
+
+
     /*
      *  Requests ACCESS_FINE_LOCATION and (on Android 10+ (Q) ACCESS_BACKGROUND_LOCATION.
      */
-    @TargetApi(29 )
-    private fun requestForegroundAndBackgroundLocationPermissions() {
-        Log.d(TAG, "requestForegroundAndBackgroundLocationPermissions() called")
-        // Step 4 add code to request foreground and background permissions
-        if (foregroundAndBackgroundLocationPermissionApproved())
-            return
-        var permissionsArray = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-        //Log.d(TAG, "What is : ${Manifest.permission.ACCESS_FINE_LOCATION}")
-        val resultCode = when {
-            runningQOrLater -> {
-                //permissionsArray += Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                //REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE
-                //askPermisionForBackgroundUsage()
-                //REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE
-                REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
-            }
-            else -> {
-                REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
-            }
-        }
-        Log.d(TAG, "Request foreground only location permission")
+//    @TargetApi(29 )
+//    private fun requestForegroundAndBackgroundLocationPermissions() {
+//        // Step 4 add code to request foreground and background permissions
+//        if (foregroundAndBackgroundLocationPermissionApproved())
+//            return
+//        var permissionsArray = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+//        //Log.d(TAG, "What is : ${Manifest.permission.ACCESS_FINE_LOCATION}")
+//        val resultCode = when {
+//            runningQOrLater -> {
+//                //permissionsArray += Manifest.permission.ACCESS_BACKGROUND_LOCATION
+//                //REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE
+//                //askPermisionForBackgroundUsage()
+//                //REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE
+//                REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
+//            }
+//            else -> {
+//                REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
+//            }
+//        }
+//        Log.d(TAG, "Request foreground only location permission")
+//        ActivityCompat.requestPermissions(
+//            this@HuntMainActivity,
+//            permissionsArray,
+//            resultCode
+//        )
+//    }
+
+    private fun requestForegroundPermission() {
+        val permissionsArray = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        val requestCode = REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
         ActivityCompat.requestPermissions(
-            this@HuntMainActivity,
+            this,
             permissionsArray,
-            resultCode
+            requestCode
         )
     }
 
     @TargetApi(Build.VERSION_CODES.Q)
-    private fun askPermisionForBackgroundUsage() {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(this@HuntMainActivity, Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-            AlertDialog.Builder(this)
-                .setTitle("BACKGROUND NEEDED")
-                .setMessage("This is a test nothing but a test")
-                .setPositiveButton("OK") { _, _ ->
-                    requestPermissions(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),  REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE)
-                }
-                .setNegativeButton("Cancel") { dialog, _ ->
-                    dialog.dismiss()
-                }
-                .create()
-                .show()
-        }
+    private fun requestBackgroundPermission() {
+        val permissionsArray = arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        val requestCode = REQUEST_FOREGROUND_AND_BACKGROUND_PERMISSION_RESULT_CODE
+        ActivityCompat.requestPermissions(
+            this,
+            permissionsArray,
+            requestCode
+        )
     }
 
     /*
