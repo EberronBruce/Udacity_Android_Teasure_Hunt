@@ -331,7 +331,7 @@ class HuntMainActivity : AppCompatActivity() {
      * permission.
      */
     private fun removeGeofences() {
-        // TODO: Step 12 add in code to remove the geofences
+        //  Step 12 add in code to remove the geofences
         if (!foregroundAndBackgroundLocationPermissionApproved()) {
             return
         }
